@@ -55,6 +55,132 @@ const regions = {
     drom: "ekaterinburg",
     autoRu: "ekaterinburg",
   },
+  novosibirsk: {
+    label: "Новосибирская область",
+    avito: "novosibirskaya_oblast",
+    drom: "novosibirsk",
+    autoRu: "novosibirsk",
+  },
+  nnovgorod: {
+    label: "Нижегородская область",
+    avito: "nizhegorodskaya_oblast",
+    drom: "nizhniy_novgorod",
+    autoRu: "nizhniy_novgorod",
+  },
+  kazan: {
+    label: "Республика Татарстан",
+    avito: "tatarstan",
+    drom: "kazan",
+    autoRu: "kazan",
+  },
+  samara: {
+    label: "Самарская область",
+    avito: "samarskaya_oblast",
+    drom: "samara",
+    autoRu: "samara",
+  },
+  rostov: {
+    label: "Ростовская область",
+    avito: "rostovskaya_oblast",
+    drom: "rostov-na-donu",
+    autoRu: "rostov-na-donu",
+  },
+  bashkortostan: {
+    label: "Республика Башкортостан",
+    avito: "bashkortostan",
+    drom: "ufa",
+    autoRu: "ufa",
+  },
+  chelyabinsk: {
+    label: "Челябинская область",
+    avito: "chelyabinskaya_oblast",
+    drom: "chelyabinsk",
+    autoRu: "chelyabinsk",
+  },
+  perm: {
+    label: "Пермский край",
+    avito: "permskiy_kray",
+    drom: "perm",
+    autoRu: "perm",
+  },
+  krasnoyarsk: {
+    label: "Красноярский край",
+    avito: "krasnoyarskiy_kray",
+    drom: "krasnoyarsk",
+    autoRu: "krasnoyarsk",
+  },
+  voronezh: {
+    label: "Воронежская область",
+    avito: "voronezhskaya_oblast",
+    drom: "voronezh",
+    autoRu: "voronezh",
+  },
+  volgograd: {
+    label: "Волгоградская область",
+    avito: "volgogradskaya_oblast",
+    drom: "volgograd",
+    autoRu: "volgograd",
+  },
+  saratov: {
+    label: "Саратовская область",
+    avito: "saratovskaya_oblast",
+    drom: "saratov",
+    autoRu: "saratov",
+  },
+  tyumen: {
+    label: "Тюменская область",
+    avito: "tyumenskaya_oblast",
+    drom: "tyumen",
+    autoRu: "tyumen",
+  },
+  irkutsk: {
+    label: "Иркутская область",
+    avito: "irkutskaya_oblast",
+    drom: "irkutsk",
+    autoRu: "irkutsk",
+  },
+  primorsky: {
+    label: "Приморский край",
+    avito: "primorskiy_kray",
+    drom: "vladivostok",
+    autoRu: "vladivostok",
+  },
+  stavropol: {
+    label: "Ставропольский край",
+    avito: "stavropolskiy_kray",
+    drom: "stavropol",
+    autoRu: "stavropol",
+  },
+  omsk: {
+    label: "Омская область",
+    avito: "omskaya_oblast",
+    drom: "omsk",
+    autoRu: "omsk",
+  },
+  ufa: {
+    label: "Уфа",
+    avito: "ufa",
+    drom: "ufa",
+    autoRu: "ufa",
+  },
+  sochi: {
+    label: "Сочи",
+    avito: "sochi",
+    drom: "sochi",
+    autoRu: "sochi",
+  },
+  kaliningrad: {
+    label: "Калининградская область",
+    avito: "kaliningradskaya_oblast",
+    drom: "kaliningrad",
+    autoRu: "kaliningrad",
+  },
+  crimea: {
+    label: "Республика Крым",
+    avito: "krym",
+    drom: "crimea",
+    autoRu: "crimea",
+  },
 };
 
 const sources = {
@@ -165,6 +291,15 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function sendBuffer(response, status, contentType, buffer) {
+  response.writeHead(status, {
+    "content-type": contentType || "application/octet-stream",
+    "cache-control": "public, max-age=86400",
+    "access-control-allow-origin": "*",
+  });
+  response.end(buffer);
+}
+
 function serveStatic(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
@@ -202,6 +337,7 @@ function cleanText(value = "") {
 function absoluteUrl(sourceUrl, maybeUrl) {
   if (!maybeUrl) return "";
   try {
+    if (String(maybeUrl).startsWith("//")) return `https:${maybeUrl}`;
     return new URL(maybeUrl, sourceUrl).toString();
   } catch {
     return "";
@@ -264,7 +400,7 @@ function collectLdItems(node, items, sourceName, sourceUrl) {
       url: absoluteUrl(sourceUrl, node.url || offer?.url),
       image: absoluteUrl(sourceUrl, image),
       price,
-      year: numberFromText(title.match(/\b(19|20)\d{2}\b/)?.[0]),
+      year: estimateYearFromTitle(title),
       mileage: numberFromText(node.mileageFromOdometer?.value || node.description),
       description: cleanText(node.description),
     });
@@ -290,7 +426,9 @@ function parseGenericCards(html, sourceName, sourceUrl) {
     if (!price || !year || text.length < 18) continue;
     if (!/toyota|kia|mazda|hyundai|skoda|volkswagen|bmw|mercedes|audi|nissan|honda|lada|ford|renault|camry|rav4|tiguan|octavia|солярис|рио|кроссовер|седан/i.test(text)) continue;
 
-    const imageMatch = body.match(/<img[^>]+(?:src|data-src)=["']([^"']+)["']/i);
+    const imageMatch = body.match(/<img[^>]+(?:src|data-src|data-original)=["']([^"']+)["']/i);
+    const srcsetMatch = body.match(/<img[^>]+srcset=["']([^"']+)["']/i);
+    const imageUrl = imageMatch?.[1] || srcsetMatch?.[1]?.split(/\s+/)?.[0];
     const title = text
       .replace(/[\d\s]{5,12}\s*(?:₽|руб|р\.|р\b).*/i, "")
       .slice(0, 90)
@@ -303,7 +441,7 @@ function parseGenericCards(html, sourceName, sourceUrl) {
       title,
       source: sourceName,
       url: absoluteUrl(sourceUrl, href),
-      image: absoluteUrl(sourceUrl, imageMatch?.[1]),
+      image: absoluteUrl(sourceUrl, imageUrl),
       price,
       year,
       mileage: numberFromText(text.match(/[\d\s]{2,9}\s*(?:км|km)/i)?.[0] || ""),
@@ -328,7 +466,7 @@ function parseJsonOfferSnippets(html, sourceName, sourceUrl) {
       url: absoluteUrl(sourceUrl, decodeJsonString(match[3])),
       image: absoluteUrl(sourceUrl, decodeJsonString(match[1])),
       price: Number(match[4]),
-      year: numberFromText(title.match(/\b(19|20)\d{2}\b/)?.[0]),
+      year: estimateYearFromTitle(title),
       mileage: null,
       description: title,
     });
@@ -365,6 +503,28 @@ function normalizeItems(items, params) {
     .map((item) => applyScore(item, params));
 }
 
+function estimateYearFromTitle(title = "") {
+  const explicitYear = numberFromText(String(title).match(/\b(19|20)\d{2}\b/)?.[0]);
+  if (explicitYear) return explicitYear;
+
+  const text = String(title).toLowerCase();
+  const generationRules = [
+    [/kia\s+rio.*\biv\b|rio\s+4-speed\s+iii/i, 2017],
+    [/kia\s+rio.*\biii\b.*рестайлинг/i, 2015],
+    [/kia\s+rio.*\biii\b/i, 2011],
+    [/toyota\s+camry.*xv70|camry\s+viii/i, 2018],
+    [/toyota\s+camry.*xv50|camry\s+vii/i, 2011],
+    [/volkswagen\s+tiguan.*ii/i, 2017],
+    [/skoda\s+octavia.*a7|octavia\s+iii/i, 2013],
+    [/hyundai\s+solaris.*ii/i, 2017],
+    [/hyundai\s+tucson.*iii/i, 2015],
+    [/mazda\s+cx-5.*ii/i, 2017],
+  ];
+
+  const matched = generationRules.find(([pattern]) => pattern.test(text));
+  return matched ? matched[1] : null;
+}
+
 function applyScore(item, params) {
   const score = scoreCar(item, params);
   return {
@@ -373,6 +533,7 @@ function applyScore(item, params) {
     scoreParts: score.parts,
     priceComment: score.priceComment,
     summary: buildSummary(item, score),
+    assistantReview: buildAssistantReview(item, score, params),
     tags: buildTags(item, score),
   };
 }
@@ -433,6 +594,70 @@ async function enrichWithVision(items, params) {
   }
 
   return enriched.map((item) => applyScore(item, params));
+}
+
+async function enrichWithListingDetails(items) {
+  const limit = 10;
+  const enriched = [];
+  let loaded = 0;
+
+  for (const item of items) {
+    if ((!item.year || !item.mileage) && item.url && loaded < limit) {
+      loaded += 1;
+      const details = await fetchListingDetails(item.url);
+      enriched.push({
+        ...item,
+        year: item.year || details.year,
+        mileage: item.mileage || details.mileage,
+        description: item.description?.length > details.description?.length ? item.description : details.description || item.description,
+        detailsLoaded: details.ok,
+      });
+    } else {
+      enriched.push(item);
+    }
+  }
+
+  return enriched;
+}
+
+async function fetchListingDetails(url) {
+  try {
+    const response = await fetchWithTimeout(url);
+    const html = await response.text();
+    const text = cleanText(html);
+    const title = cleanText(html.match(/<title>(.*?)<\/title>/i)?.[1] || "");
+    const year = extractYearFromListing(html, text, title);
+    const mileage = extractMileageFromListing(html, text);
+    const description = cleanText(
+      html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)?.[1] ||
+      html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ||
+      title
+    );
+
+    return { ok: response.ok, year, mileage, description };
+  } catch {
+    return { ok: false, year: null, mileage: null, description: "" };
+  }
+}
+
+function extractYearFromListing(html, text, title) {
+  const candidates = [
+    html.match(/"productionDate"\s*:\s*"?((?:19|20)\d{2})"?/i)?.[1],
+    html.match(/"year"\s*:\s*"?((?:19|20)\d{2})"?/i)?.[1],
+    text.match(/(?:год выпуска|год|выпуска)\D{0,30}((?:19|20)\d{2})/i)?.[1],
+    title.match(/\b((?:19|20)\d{2})\b/)?.[1],
+  ];
+  return numberFromText(candidates.find(Boolean) || "");
+}
+
+function extractMileageFromListing(html, text) {
+  const candidates = [
+    html.match(/"mileage"\s*:\s*"?(\d{1,7})"?/i)?.[1],
+    html.match(/"mileageFromOdometer"\s*:\s*\{[^}]*"value"\s*:\s*"?(\d{1,7})"?/i)?.[1],
+    text.match(/пробег\D{0,40}([\d\s]{2,9})\s*(?:км|km)/i)?.[1],
+    text.match(/([\d\s]{2,9})\s*(?:км|km)/i)?.[1],
+  ];
+  return numberFromText(candidates.find(Boolean) || "");
 }
 
 async function analyzeImage(imageUrl) {
@@ -560,6 +785,30 @@ async function fetchImageWithTimeout(url) {
   }
 }
 
+async function handleImageProxy(request, response) {
+  const currentUrl = new URL(request.url, `http://${request.headers.host}`);
+  const target = currentUrl.searchParams.get("url");
+
+  if (!target || !/^https?:\/\//i.test(target)) {
+    sendJson(response, 400, { error: "Invalid image url" });
+    return;
+  }
+
+  try {
+    const imageResponse = await fetchImageWithTimeout(target);
+    if (!imageResponse.ok) {
+      sendJson(response, imageResponse.status, { error: `Image request failed: ${imageResponse.status}` });
+      return;
+    }
+
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
+    sendBuffer(response, 200, contentType, buffer);
+  } catch (error) {
+    sendJson(response, 502, { error: error.message });
+  }
+}
+
 function isRelevantToQuery(item, query) {
   const rawTerms = cleanText(query)
     .toLowerCase()
@@ -605,6 +854,109 @@ function buildSummary(item, score) {
   if (item.price) parts.push(`Цена ${score.priceComment}.`);
   if (item.description?.length < 80) parts.push("Описание короткое, перед звонком нужно запросить VIN, отчет и дополнительные фото.");
   return parts.join(" ");
+}
+
+function buildAssistantReview(item, score, params) {
+  const budget = Number(params.budget || 0);
+  const decision = getDecision(score.total);
+  const reasons = [];
+  const risks = [];
+  const checks = [];
+  const questions = [];
+
+  if (item.price && budget) {
+    if (item.price <= budget * 0.86) {
+      reasons.push("Цена заметно ниже вашего бюджета, поэтому объявление стоит быстро проверить, пока оно не ушло.");
+      risks.push("Слишком привлекательная цена может означать срочную продажу, скрытые вложения или ограничения по документам.");
+    } else if (item.price <= budget) {
+      reasons.push("Цена проходит фильтр и находится в рабочем диапазоне бюджета.");
+    } else {
+      risks.push("Цена выше заданного бюджета, торг или пересмотр фильтра обязателен.");
+    }
+  } else {
+    risks.push("Цена не распознана надежно, сравните ее на самой площадке перед звонком.");
+  }
+
+  if (item.year) {
+    const age = new Date().getFullYear() - item.year;
+    if (age <= 5) reasons.push("Автомобиль относительно свежий, риск возрастных вложений ниже.");
+    else if (age <= 10) checks.push("Проверить регламентные работы по возрасту: жидкости, подвеску, тормоза, резину.");
+    else risks.push("Возраст уже существенный, диагностика кузова и технической части особенно важна.");
+  } else {
+    risks.push("Год не подтвержден из открытых данных, нужно сверить ПТС/СТС и отчет по VIN.");
+  }
+
+  if (item.mileage) {
+    if (item.mileage <= 70000) reasons.push("Пробег выглядит умеренным для рынка, если он подтверждается сервисной историей.");
+    else if (item.mileage <= 150000) checks.push("Пробег средний: проверьте обслуживание коробки, подвески и тормозов.");
+    else risks.push("Пробег высокий, возможны вложения в подвеску, двигатель, коробку и салон.");
+  } else {
+    risks.push("Пробег не найден в открытых данных, запросите фото одометра и отчет.");
+  }
+
+  if (item.photoAnalysis?.ok) {
+    if (item.photoAnalysis.score >= 7.3) {
+      reasons.push("Фото достаточно четкие для первичной оценки внешнего состояния.");
+    } else if (item.photoAnalysis.score >= 6.2) {
+      checks.push("Фото средние по качеству: попросите дополнительные снимки кузова, салона, порогов и арок.");
+    } else {
+      risks.push("Фото слабые: по ним трудно оценить кузов и состояние, лучше не ехать без дополнительных материалов.");
+    }
+  } else if (item.image) {
+    checks.push("Фото есть, но локальный анализ не смог их проверить; откройте объявление и посмотрите галерею вручную.");
+  } else {
+    risks.push("Фото не извлечены из выдачи, объявление требует ручной проверки.");
+  }
+
+  if (!item.description || item.description.length < 90) {
+    risks.push("Описание короткое: продавец не раскрыл историю, обслуживание и возможные нюансы.");
+  } else {
+    reasons.push("В описании есть дополнительные данные, это повышает прозрачность объявления.");
+  }
+
+  questions.push("Сколько владельцев по ПТС и кто фактически продает автомобиль?");
+  questions.push("Есть ли VIN, отчет, сервисная история и заказ-наряды?");
+  questions.push("Какие детали красились, были ли ДТП и страховые выплаты?");
+  questions.push("Готов ли продавец на диагностику в выбранном вами сервисе?");
+
+  checks.push("Сверить VIN на кузове, в документах и в отчете.");
+  checks.push("Проверить кузов толщиномером, особенно переднюю часть, стойки, пороги и крышу.");
+  checks.push("Сделать компьютерную диагностику и осмотр ходовой.");
+
+  return {
+    decision,
+    verdict: buildVerdict(item, score, decision),
+    reasons: unique(reasons).slice(0, 4),
+    risks: unique(risks).slice(0, 5),
+    checks: unique(checks).slice(0, 5),
+    questions: unique(questions).slice(0, 4),
+    recommendation: getRecommendation(score.total),
+  };
+}
+
+function getDecision(score) {
+  if (score >= 8.2) return "Сильный кандидат";
+  if (score >= 7.2) return "Можно рассматривать";
+  if (score >= 6.4) return "Только после проверки";
+  return "Лучше пропустить";
+}
+
+function getRecommendation(score) {
+  if (score >= 8.2) return "Позвонить продавцу и бронировать осмотр, но не вносить предоплату без проверки документов.";
+  if (score >= 7.2) return "Добавить в шорт-лист и сравнить с 3-5 похожими вариантами.";
+  if (score >= 6.4) return "Ехать на осмотр только если продавец заранее пришлет VIN, отчет и дополнительные фото.";
+  return "Не тратить время без сильного торга или подтвержденной прозрачной истории.";
+}
+
+function buildVerdict(item, score, decision) {
+  const price = item.price ? `за ${new Intl.NumberFormat("ru-RU").format(item.price)} ₽` : "без надежно распознанной цены";
+  const year = item.year ? `${item.year} года` : "с неподтвержденным годом";
+  const mileage = item.mileage ? `и пробегом ${new Intl.NumberFormat("ru-RU").format(item.mileage)} км` : "и неподтвержденным пробегом";
+  return `${decision}: ${item.title} ${year} ${mileage} ${price}. Итоговый балл ${score.total.toFixed(1)} из 10.`;
+}
+
+function unique(items) {
+  return [...new Set(items.filter(Boolean))];
 }
 
 async function fetchSource(sourceKey, params) {
@@ -701,6 +1053,9 @@ async function handleSearch(request, response) {
   }
   let allItems = normalizeItems(results.flatMap((result) => result.items), params)
     .sort((a, b) => b.score - a.score);
+  allItems = (await enrichWithListingDetails(allItems))
+    .map((item) => applyScore(item, params))
+    .sort((a, b) => b.score - a.score);
   allItems = (await enrichWithVision(allItems, params))
     .sort((a, b) => b.score - a.score);
   const realPrices = allItems.map((item) => item.price).filter(Boolean);
@@ -723,6 +1078,11 @@ const server = http.createServer((request, response) => {
     handleSearch(request, response).catch((error) => {
       sendJson(response, 500, { error: error.message });
     });
+    return;
+  }
+
+  if (url.pathname === "/api/image") {
+    handleImageProxy(request, response);
     return;
   }
 

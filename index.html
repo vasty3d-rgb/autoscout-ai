@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoScout AI - живой подбор авто</title>
-  <meta name="description" content="Локальное приложение для поиска автомобилей с Avito, Drom и Auto.ru с оценкой цены, фото и риска сделки.">
+  <title>AutoScout AI - подбор автомобилей</title>
+  <meta name="description" content="Подбор автомобилей с AI-рейтингом по объявлениям Auto.ru, Drom и Avito.">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,84 +14,266 @@
       <span>AutoScout AI</span>
     </a>
     <nav class="topnav" aria-label="Навигация">
-      <a href="#results">Результаты</a>
-      <a href="#compare">Сравнение</a>
-      <a href="#insights">AI-разбор</a>
+      <a href="#search">Подбор</a>
+      <a href="#results">Рейтинг</a>
+      <a href="#compare">Источники</a>
     </nav>
-    <button class="ghost-button" type="button" id="demoButton">Живой поиск</button>
+    <button class="ghost-button" type="button" id="demoButton">Запустить поиск</button>
   </header>
 
   <main>
     <section class="hero" id="search">
-      <div class="hero-copy">
-        <p class="eyebrow">Avito + Drom + Auto.ru</p>
-        <h1>Быстрый поиск живых машин с AI-оценкой</h1>
-        <p class="lead">Задайте модель, бюджет и регион. Локальный backend запросит реальные страницы площадок, извлечет доступные объявления, оценит цену, фотографии, прозрачность описания и выдаст итоговый балл по 10-балльной шкале.</p>
+      <div class="hero-media" aria-hidden="true">
+        <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1800&q=82" alt="">
       </div>
+      <div class="hero-content">
+        <div class="hero-copy">
+          <p class="eyebrow">AI-подбор по Auto.ru, Drom и Avito</p>
+          <h1>Найдите достойную машину быстрее, чем она уйдет</h1>
+          <p class="lead">Фильтр собирает параметры как на крупных площадках, а рейтинг поднимает наверх объявления с лучшей ценой, понятными фото и меньшим риском.</p>
+          <div class="hero-points" aria-label="Преимущества">
+            <span>живые ссылки</span>
+            <span>оценка фото</span>
+            <span>риск сделки</span>
+          </div>
+        </div>
 
-      <form class="search-panel" id="searchForm">
-        <label>
-          <span>Марка и модель</span>
-          <input id="queryInput" type="text" value="Toyota Camry" placeholder="Например: Toyota Camry">
-        </label>
-        <label>
-          <span>Регион</span>
-          <select id="regionInput">
-            <option value="moscow">Москва и область</option>
-            <option value="spb">Санкт-Петербург</option>
-            <option value="krasnodar">Краснодарский край</option>
-            <option value="ekb">Екатеринбург</option>
-            <option value="all">Вся Россия</option>
-          </select>
-        </label>
-        <label>
-          <span>Бюджет до</span>
-          <select id="budgetInput">
-            <option value="1800000">1.8 млн ₽</option>
-            <option value="2500000" selected>2.5 млн ₽</option>
-            <option value="3500000">3.5 млн ₽</option>
-            <option value="5000000">5 млн ₽</option>
-          </select>
-        </label>
-        <label>
-          <span>Год от</span>
-          <select id="yearInput">
-            <option value="2015">2015</option>
-            <option value="2018" selected>2018</option>
-            <option value="2020">2020</option>
-            <option value="2022">2022</option>
-          </select>
-        </label>
-        <label>
-          <span>Приоритет</span>
-          <select id="priorityInput">
-            <option value="balanced">Баланс цена/состояние</option>
-            <option value="safe">Минимум риска</option>
-            <option value="cheap">Лучшая цена</option>
-            <option value="fresh">Свежий год и малый пробег</option>
-          </select>
-        </label>
-        <button class="primary-button" type="submit">
-          <span>Найти лучшие варианты</span>
-        </button>
-      </form>
+        <form class="search-panel" id="searchForm">
+          <div class="filter-header">
+            <div>
+              <p class="eyebrow">Фильтр</p>
+              <h2>Параметры поиска</h2>
+            </div>
+            <button class="link-button" type="button" id="resetFilters">Сбросить</button>
+          </div>
+
+          <div class="filter-grid main-filters">
+            <label>
+              <span>Марка</span>
+              <select id="brandInput"></select>
+            </label>
+            <label>
+              <span>Модель</span>
+              <select id="modelInput"></select>
+            </label>
+            <label class="wide-field">
+              <span>Ключевые слова</span>
+              <input id="queryInput" type="text" value="Toyota Camry" placeholder="Например: гибрид, не такси, максимальная комплектация">
+            </label>
+          </div>
+
+          <div class="filter-tabs" role="tablist" aria-label="Разделы фильтра">
+            <button class="filter-tab is-active" type="button" data-tab="basic">Основное</button>
+            <button class="filter-tab" type="button" data-tab="tech">Характеристики</button>
+            <button class="filter-tab" type="button" data-tab="seller">Продавец</button>
+          </div>
+
+          <div class="filter-page is-active" data-page="basic">
+            <div class="filter-grid">
+              <label>
+                <span>Регион</span>
+                <select id="regionInput"></select>
+              </label>
+              <label>
+                <span>Радиус</span>
+                <select id="radiusInput">
+                  <option value="0">Только регион</option>
+                  <option value="50">+ 50 км</option>
+                  <option value="100" selected>+ 100 км</option>
+                  <option value="300">+ 300 км</option>
+                  <option value="all">Вся Россия</option>
+                </select>
+              </label>
+              <div class="price-filter wide-field">
+                <div class="price-filter-head">
+                  <span>Цена</span>
+                  <strong id="priceRangeLabel">0 ₽ - 2 500 000 ₽</strong>
+                </div>
+                <div class="range-slider">
+                  <div class="range-track"></div>
+                  <div class="range-fill" id="priceRangeFill"></div>
+                  <input id="priceMinInput" type="range" min="0" max="10000000" step="50000" value="0" aria-label="Цена от">
+                  <input id="budgetInput" type="range" min="0" max="10000000" step="50000" value="2500000" aria-label="Цена до">
+                </div>
+                <div class="price-inputs">
+                  <label>
+                    <span>От</span>
+                    <input id="priceMinNumber" type="number" min="0" max="10000000" step="50000" value="0">
+                  </label>
+                  <label>
+                    <span>До</span>
+                    <input id="budgetNumber" type="number" min="0" max="10000000" step="50000" value="2500000">
+                  </label>
+                </div>
+                <div class="price-presets" aria-label="Быстрый выбор цены">
+                  <button type="button" data-price-max="1000000">до 1 млн</button>
+                  <button type="button" data-price-max="2500000">до 2.5 млн</button>
+                  <button type="button" data-price-max="5000000">до 5 млн</button>
+                  <button type="button" data-price-max="10000000">до 10 млн</button>
+                </div>
+              </div>
+              <label>
+                <span>Год от</span>
+                <select id="yearInput"></select>
+              </label>
+              <label>
+                <span>Год до</span>
+                <select id="yearToInput"></select>
+              </label>
+              <label>
+                <span>Пробег до</span>
+                <select id="mileageInput">
+                  <option value="">Любой</option>
+                  <option value="30000">30 000 км</option>
+                  <option value="60000">60 000 км</option>
+                  <option value="100000">100 000 км</option>
+                  <option value="150000">150 000 км</option>
+                  <option value="200000">200 000 км</option>
+                </select>
+              </label>
+              <label>
+                <span>Приоритет AI</span>
+                <select id="priorityInput">
+                  <option value="balanced">Баланс цена/состояние</option>
+                  <option value="safe">Минимум риска</option>
+                  <option value="cheap">Лучшая цена</option>
+                  <option value="fresh">Свежий год и малый пробег</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-page" data-page="tech">
+            <div class="filter-grid">
+              <label>
+                <span>Кузов</span>
+                <select id="bodyInput">
+                  <option value="">Любой</option>
+                  <option>Седан</option>
+                  <option>Лифтбек</option>
+                  <option>Хэтчбек</option>
+                  <option>Универсал</option>
+                  <option>Кроссовер</option>
+                  <option>Внедорожник</option>
+                  <option>Минивэн</option>
+                  <option>Купе</option>
+                  <option>Пикап</option>
+                </select>
+              </label>
+              <label>
+                <span>Коробка</span>
+                <select id="transmissionInput">
+                  <option value="">Любая</option>
+                  <option>Автомат</option>
+                  <option>Робот</option>
+                  <option>Вариатор</option>
+                  <option>Механика</option>
+                </select>
+              </label>
+              <label>
+                <span>Двигатель</span>
+                <select id="engineInput">
+                  <option value="">Любой</option>
+                  <option>Бензин</option>
+                  <option>Дизель</option>
+                  <option>Гибрид</option>
+                  <option>Электро</option>
+                  <option>Газ</option>
+                </select>
+              </label>
+              <label>
+                <span>Привод</span>
+                <select id="driveInput">
+                  <option value="">Любой</option>
+                  <option>Передний</option>
+                  <option>Задний</option>
+                  <option>Полный</option>
+                </select>
+              </label>
+              <label>
+                <span>Мощность от</span>
+                <input id="powerMinInput" type="number" min="0" step="10" placeholder="л.с.">
+              </label>
+              <label>
+                <span>Объем до</span>
+                <select id="volumeInput">
+                  <option value="">Любой</option>
+                  <option value="1.6">до 1.6 л</option>
+                  <option value="2.0">до 2.0 л</option>
+                  <option value="3.0">до 3.0 л</option>
+                  <option value="4.0">до 4.0 л</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-page" data-page="seller">
+            <div class="filter-grid">
+              <label>
+                <span>Продавец</span>
+                <select id="sellerInput">
+                  <option value="">Любой</option>
+                  <option>Частник</option>
+                  <option>Дилер</option>
+                  <option>Официальный дилер</option>
+                </select>
+              </label>
+              <label>
+                <span>Владельцев до</span>
+                <select id="ownersInput">
+                  <option value="">Не важно</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </label>
+              <label>
+                <span>Состояние</span>
+                <select id="conditionInput">
+                  <option value="">Любое</option>
+                  <option>Не битая</option>
+                  <option>Без окраса</option>
+                  <option>Сервисная история</option>
+                  <option>Оригинал ПТС</option>
+                </select>
+              </label>
+              <label>
+                <span>Источники</span>
+                <select id="sourceInput">
+                  <option value="avito,drom,autoRu">Все площадки</option>
+                  <option value="autoRu">Только Auto.ru</option>
+                  <option value="drom">Только Drom</option>
+                  <option value="avito">Только Avito</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <div class="search-preview" id="searchPreview">Toyota Camry · Москва · до 2 500 000 ₽</div>
+            <button class="primary-button" type="submit">
+              <span>Показать лучшие объявления</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </section>
 
     <section class="metrics" aria-label="Показатели подбора">
       <article>
         <strong id="foundCount">0</strong>
-        <span>объявлений в выдаче</span>
+        <span>объявлений найдено</span>
       </article>
       <article>
         <strong id="bestScore">0.0</strong>
         <span>лучший AI-балл</span>
       </article>
       <article>
-        <strong id="avgPrice">0 ₽</strong>
+        <strong id="avgPrice">нет данных</strong>
         <span>средняя цена</span>
       </article>
       <article>
-        <strong id="riskLevel">низкий</strong>
+        <strong id="riskLevel">нет данных</strong>
         <span>средний риск</span>
       </article>
     </section>
@@ -100,12 +282,12 @@
       <aside class="source-panel" id="compare">
         <div class="panel-heading">
           <p class="eyebrow">Источники</p>
-          <h2>Где искать</h2>
+          <h2>Площадки</h2>
         </div>
         <div class="source-list" id="sourceList"></div>
         <div class="notice">
-          <strong>Важно</strong>
-          <p>Поиск работает через публично доступные страницы без обхода CAPTCHA и защит. Если площадка блокирует HTML-выдачу, приложение покажет статус и прямую ссылку. Для стабильного продакшена лучше подключить официальный API, партнерский фид или легальный поставщик объявлений.</p>
+          <strong>Статус поиска</strong>
+          <p>Если площадка закрывает выдачу антиботом, приложение покажет прямую ссылку. Auto.ru и Drom обычно отдают больше открытых данных, Avito часто требует официальный доступ.</p>
         </div>
       </aside>
 
@@ -127,29 +309,29 @@
 
     <section class="insights" id="insights">
       <div>
-        <p class="eyebrow">AI-разбор</p>
-        <h2>Как считается оценка</h2>
+        <p class="eyebrow">Почему это продает</p>
+        <h2>Покупатель видит не список, а короткий шорт-лист</h2>
       </div>
       <div class="insight-grid">
         <article>
           <span>01</span>
           <h3>Цена</h3>
-          <p>Сравнивается с медианой похожих машин: год, пробег, регион, комплектация и история спроса.</p>
+          <p>Алгоритм выделяет варианты, которые проходят бюджет и выглядят выгоднее похожих объявлений.</p>
         </article>
         <article>
           <span>02</span>
           <h3>Фото</h3>
-          <p>Проверяются зазоры, разный оттенок кузовных деталей, качество салона, шины, оптика и признаки перекраса.</p>
+          <p>Локальный vision-lite анализирует яркость, резкость, контраст и пригодность фото для первичного осмотра.</p>
         </article>
         <article>
           <span>03</span>
-          <h3>Описание</h3>
-          <p>AI ищет красные флаги: срочная продажа, нет VIN, мало фото, противоречивый пробег, слишком короткое описание.</p>
+          <h3>Риск</h3>
+          <p>Короткие описания, мало данных и слабые фото понижают доверие к объявлению.</p>
         </article>
         <article>
           <span>04</span>
-          <h3>Итог</h3>
-          <p>Балл 8+ означает хороший кандидат на звонок и проверку. Балл ниже 7 требует аккуратной диагностики.</p>
+          <h3>Действие</h3>
+          <p>У каждой карточки есть понятная оценка, причины и ссылка на исходное объявление.</p>
         </article>
       </div>
     </section>
@@ -175,7 +357,11 @@
         <div class="score-bars"></div>
         <p class="ai-summary"></p>
         <div class="tags"></div>
-        <a class="open-link" target="_blank" rel="noreferrer">Открыть поиск</a>
+        <div class="card-actions">
+          <button class="review-toggle" type="button">Разбор AI</button>
+          <a class="open-link" target="_blank" rel="noreferrer">Открыть объявление</a>
+        </div>
+        <div class="assistant-review" hidden></div>
       </div>
     </article>
   </template>
