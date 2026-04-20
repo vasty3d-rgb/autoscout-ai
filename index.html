@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoScout AI - живой подбор авто</title>
+  <meta name="description" content="Локальное приложение для поиска автомобилей с Avito, Drom и Auto.ru с оценкой цены, фото и риска сделки.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#search" aria-label="AutoScout AI">
+      <span class="brand-mark">A</span>
+      <span>AutoScout AI</span>
+    </a>
+    <nav class="topnav" aria-label="Навигация">
+      <a href="#results">Результаты</a>
+      <a href="#compare">Сравнение</a>
+      <a href="#insights">AI-разбор</a>
+    </nav>
+    <button class="ghost-button" type="button" id="demoButton">Живой поиск</button>
+  </header>
+
+  <main>
+    <section class="hero" id="search">
+      <div class="hero-copy">
+        <p class="eyebrow">Avito + Drom + Auto.ru</p>
+        <h1>Быстрый поиск живых машин с AI-оценкой</h1>
+        <p class="lead">Задайте модель, бюджет и регион. Локальный backend запросит реальные страницы площадок, извлечет доступные объявления, оценит цену, фотографии, прозрачность описания и выдаст итоговый балл по 10-балльной шкале.</p>
+      </div>
+
+      <form class="search-panel" id="searchForm">
+        <label>
+          <span>Марка и модель</span>
+          <input id="queryInput" type="text" value="Toyota Camry" placeholder="Например: Toyota Camry">
+        </label>
+        <label>
+          <span>Регион</span>
+          <select id="regionInput">
+            <option value="moscow">Москва и область</option>
+            <option value="spb">Санкт-Петербург</option>
+            <option value="krasnodar">Краснодарский край</option>
+            <option value="ekb">Екатеринбург</option>
+            <option value="all">Вся Россия</option>
+          </select>
+        </label>
+        <label>
+          <span>Бюджет до</span>
+          <select id="budgetInput">
+            <option value="1800000">1.8 млн ₽</option>
+            <option value="2500000" selected>2.5 млн ₽</option>
+            <option value="3500000">3.5 млн ₽</option>
+            <option value="5000000">5 млн ₽</option>
+          </select>
+        </label>
+        <label>
+          <span>Год от</span>
+          <select id="yearInput">
+            <option value="2015">2015</option>
+            <option value="2018" selected>2018</option>
+            <option value="2020">2020</option>
+            <option value="2022">2022</option>
+          </select>
+        </label>
+        <label>
+          <span>Приоритет</span>
+          <select id="priorityInput">
+            <option value="balanced">Баланс цена/состояние</option>
+            <option value="safe">Минимум риска</option>
+            <option value="cheap">Лучшая цена</option>
+            <option value="fresh">Свежий год и малый пробег</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">
+          <span>Найти лучшие варианты</span>
+        </button>
+      </form>
+    </section>
+
+    <section class="metrics" aria-label="Показатели подбора">
+      <article>
+        <strong id="foundCount">0</strong>
+        <span>объявлений в выдаче</span>
+      </article>
+      <article>
+        <strong id="bestScore">0.0</strong>
+        <span>лучший AI-балл</span>
+      </article>
+      <article>
+        <strong id="avgPrice">0 ₽</strong>
+        <span>средняя цена</span>
+      </article>
+      <article>
+        <strong id="riskLevel">низкий</strong>
+        <span>средний риск</span>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <aside class="source-panel" id="compare">
+        <div class="panel-heading">
+          <p class="eyebrow">Источники</p>
+          <h2>Где искать</h2>
+        </div>
+        <div class="source-list" id="sourceList"></div>
+        <div class="notice">
+          <strong>Важно</strong>
+          <p>Поиск работает через публично доступные страницы без обхода CAPTCHA и защит. Если площадка блокирует HTML-выдачу, приложение покажет статус и прямую ссылку. Для стабильного продакшена лучше подключить официальный API, партнерский фид или легальный поставщик объявлений.</p>
+        </div>
+      </aside>
+
+      <section class="results" id="results">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">AI-рейтинг</p>
+            <h2>Лучшие варианты</h2>
+          </div>
+          <div class="sort-control" role="group" aria-label="Сортировка">
+            <button class="sort-button is-active" type="button" data-sort="score">Балл</button>
+            <button class="sort-button" type="button" data-sort="price">Цена</button>
+            <button class="sort-button" type="button" data-sort="year">Год</button>
+          </div>
+        </div>
+        <div class="cards" id="resultsGrid"></div>
+      </section>
+    </section>
+
+    <section class="insights" id="insights">
+      <div>
+        <p class="eyebrow">AI-разбор</p>
+        <h2>Как считается оценка</h2>
+      </div>
+      <div class="insight-grid">
+        <article>
+          <span>01</span>
+          <h3>Цена</h3>
+          <p>Сравнивается с медианой похожих машин: год, пробег, регион, комплектация и история спроса.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Фото</h3>
+          <p>Проверяются зазоры, разный оттенок кузовных деталей, качество салона, шины, оптика и признаки перекраса.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Описание</h3>
+          <p>AI ищет красные флаги: срочная продажа, нет VIN, мало фото, противоречивый пробег, слишком короткое описание.</p>
+        </article>
+        <article>
+          <span>04</span>
+          <h3>Итог</h3>
+          <p>Балл 8+ означает хороший кандидат на звонок и проверку. Балл ниже 7 требует аккуратной диагностики.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <template id="carCardTemplate">
+    <article class="car-card">
+      <div class="photo-wrap">
+        <img alt="">
+        <span class="source-badge"></span>
+        <strong class="score-badge"></strong>
+      </div>
+      <div class="car-body">
+        <div class="car-title-row">
+          <h3></h3>
+          <button class="favorite-button" type="button" aria-label="Добавить в избранное">☆</button>
+        </div>
+        <p class="car-meta"></p>
+        <div class="price-row">
+          <strong class="price"></strong>
+          <span class="price-comment"></span>
+        </div>
+        <div class="score-bars"></div>
+        <p class="ai-summary"></p>
+        <div class="tags"></div>
+        <a class="open-link" target="_blank" rel="noreferrer">Открыть поиск</a>
+      </div>
+    </article>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>
