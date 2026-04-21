@@ -340,6 +340,7 @@ function renderResults() {
     const img = card.querySelector("img");
     const scoreBadge = card.querySelector(".score-badge");
 
+    card.dataset.resultIndex = String(currentResults.indexOf(car));
     img.src = getDisplayImage(car);
     img.alt = car.title;
     img.onerror = () => {
@@ -366,6 +367,7 @@ function renderResults() {
     });
 
     renderAssistantReview(card, car);
+    renderDeepAnalysis(card, car.deepAnalysis);
     renderBars(card, car);
     resultsGrid.append(card);
   });
@@ -394,6 +396,47 @@ function renderAssistantReview(card, car) {
   `;
 }
 
+function renderDeepAnalysis(card, analysis) {
+  const holder = card.querySelector(".deep-analysis");
+
+  if (!analysis) {
+    holder.innerHTML = "";
+    return;
+  }
+
+  holder.innerHTML = `
+    <div class="analysis-head">
+      <span class="analysis-pill">${escapeHtml(analysis.decision || "Разбор готов")}</span>
+      <strong>${escapeHtml(analysis.verdict || "Глубокий анализ объявления")}</strong>
+      <p>${escapeHtml(analysis.summary || "Собрал риски, вопросы продавцу и примерные расходы на обслуживание.")}</p>
+    </div>
+    <div class="analysis-grid">
+      ${renderAnalysisBlock("Почему можно смотреть", analysis.buySignals)}
+      ${renderAnalysisBlock("Риски и сомнения", analysis.risks)}
+      ${renderAnalysisBlock("Что проверить", analysis.inspectionPlan)}
+      ${renderAnalysisBlock("Вопросы продавцу", analysis.whatToAsk)}
+      ${renderAnalysisBlock("Возможные вложения", analysis.likelyRepairs)}
+      ${renderAnalysisBlock("Обслуживание", analysis.maintenanceEstimate)}
+    </div>
+    <div class="analysis-note">
+      <strong>Итог</strong>
+      <p>${escapeHtml(analysis.finalAdvice || "Перед покупкой обязательно проверьте VIN, документы и сделайте диагностику в профильном сервисе.")}</p>
+    </div>
+  `;
+}
+
+function renderAnalysisBlock(title, items = []) {
+  if (!items.length) return "";
+  return `
+    <section class="analysis-block">
+      <strong>${escapeHtml(title)}</strong>
+      <ul>
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </section>
+  `;
+}
+
 function renderReviewList(title, items = []) {
   if (!items.length) return "";
   return `
@@ -404,6 +447,60 @@ function renderReviewList(title, items = []) {
       </ul>
     </div>
   `;
+}
+
+async function analyzeListing(card, button) {
+  const index = Number(card.dataset.resultIndex);
+  const car = currentResults[index];
+  const panel = card.querySelector(".deep-analysis");
+
+  if (!car) return;
+
+  if (car.deepAnalysis) {
+    const isHidden = panel.hidden;
+    panel.hidden = !isHidden;
+    button.classList.toggle("is-active", isHidden);
+    button.textContent = isHidden ? "Скрыть анализ" : "Проанализировать";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Анализирую...";
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="analysis-loading">
+      <strong>Смотрю объявление глубже</strong>
+      <p>Пытаюсь получить публичное описание, сверяю цену, пробег, фото и типичные расходы по модели.</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        item: car,
+        filters: Object.fromEntries(getSearchParams()),
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
+    const payload = await response.json();
+    car.deepAnalysis = payload.analysis;
+    renderDeepAnalysis(card, car.deepAnalysis);
+    button.classList.add("is-active");
+    button.textContent = "Скрыть анализ";
+  } catch (error) {
+    panel.innerHTML = `
+      <div class="analysis-loading is-error">
+        <strong>Не удалось разобрать объявление</strong>
+        <p>${escapeHtml(error.message)}. Откройте объявление вручную и попробуйте позже.</p>
+      </div>
+    `;
+    button.textContent = "Проанализировать";
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function getDecisionClass(decision = "") {
@@ -555,6 +652,13 @@ resultsGrid.addEventListener("click", (event) => {
     panel.hidden = !isHidden;
     reviewButton.classList.toggle("is-active", isHidden);
     reviewButton.textContent = isHidden ? "Скрыть разбор" : "Разбор AI";
+    return;
+  }
+
+  const analyzeButton = event.target.closest(".deep-analyze-button");
+  if (analyzeButton) {
+    const card = analyzeButton.closest(".car-card");
+    analyzeListing(card, analyzeButton);
     return;
   }
 

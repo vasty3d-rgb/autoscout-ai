@@ -287,8 +287,31 @@ function sendJson(response, status, payload) {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
     "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
   });
   response.end(JSON.stringify(payload));
+}
+
+function readJsonBody(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 512000) {
+        reject(new Error("Request body is too large"));
+        request.destroy();
+      }
+    });
+    request.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    request.on("error", reject);
+  });
 }
 
 function sendBuffer(response, status, contentType, buffer) {
@@ -809,6 +832,251 @@ async function handleImageProxy(request, response) {
   }
 }
 
+async function handleAnalyze(request, response) {
+  if (request.method === "OPTIONS") {
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  const body = await readJsonBody(request);
+  const item = body.item || {};
+  const filters = body.filters || {};
+  let details = { ok: false, year: null, mileage: null, description: "" };
+
+  if (item.url && /^https?:\/\//i.test(item.url)) {
+    details = await fetchListingDetails(item.url);
+  }
+
+  const merged = {
+    ...item,
+    year: item.year || details.year,
+    mileage: item.mileage || details.mileage,
+    description: details.description?.length > item.description?.length ? details.description : item.description || details.description,
+    detailsLoaded: details.ok,
+  };
+
+  const score = scoreCar(merged, { budget: filters.budget || filters.priceMax || 0, year: filters.year || "" });
+  const analysis = buildDeepListingAnalysis(merged, score, filters, details);
+
+  sendJson(response, 200, { ok: true, analysis });
+}
+
+function buildDeepListingAnalysis(item, score, filters, details) {
+  const profile = getMaintenanceProfile(item);
+  const description = cleanText(`${item.title || ""} ${item.description || ""}`).toLowerCase();
+  const age = item.year ? new Date().getFullYear() - item.year : null;
+  const budget = Number(filters.budget || filters.priceMax || 0);
+  const risks = [];
+  const buySignals = [];
+  const inspectionPlan = [
+    "Проверить VIN, ПТС/СТС, ограничения, залоги, количество владельцев и историю регистраций.",
+    "Сделать диагностику двигателя, коробки, подвески, тормозов и электронных блоков в профильном сервисе.",
+    "Осмотреть кузов толщиномером: стойки, пороги, арки, проемы дверей, лонжероны и крышу.",
+  ];
+  const whatToAsk = [
+    "Почему продаете и сколько машина у вас во владении?",
+    "Есть ли VIN, отчет, заказ-наряды и фото ПТС/СТС без лишних персональных данных?",
+    "Какие работы делались за последние 20 000 км и что требует ремонта сейчас?",
+  ];
+  const likelyRepairs = [...profile.repairs];
+  const maintenanceEstimate = [
+    `Обычное годовое обслуживание: примерно ${profile.annual}.`,
+    `Разовое ТО с маслами и фильтрами: примерно ${profile.basicService}.`,
+    `Резерв после покупки лучше держать не ниже ${profile.reserve}.`,
+  ];
+
+  if (details.ok) {
+    buySignals.push("Удалось прочитать публичную страницу объявления и сверить часть данных с карточкой.");
+  } else {
+    risks.push("Площадка не отдала полную страницу автоматически. Анализ сделан по карточке и доступному описанию, без обхода антибота.");
+  }
+
+  if (item.price && budget) {
+    if (item.price < budget * 0.86) {
+      buySignals.push("Цена заметно ниже заданного бюджета, есть смысл быстро проверить, пока объявление актуально.");
+      risks.push("Слишком привлекательная цена может скрывать срочность, юридические ограничения или будущие вложения.");
+    } else if (item.price <= budget) {
+      buySignals.push("Цена проходит фильтр бюджета и выглядит рабочей для первичного отбора.");
+    } else {
+      risks.push("Цена выше бюджета: перед осмотром нужен торг или пересмотр условий поиска.");
+    }
+  } else {
+    risks.push("Цена не распознана надежно, ее нужно сверить на площадке.");
+  }
+
+  if (item.year) {
+    if (age <= 5) buySignals.push("Возраст небольшой, риск крупных возрастных вложений ниже среднего.");
+    else if (age <= 10) inspectionPlan.push("По возрасту уже важны регламентные жидкости, состояние подвески, тормозов, аккумулятора и резины.");
+    else risks.push("Возраст существенный: кузов, электрика, резиновые элементы и скрытые ДТП нужно проверять особенно внимательно.");
+  } else {
+    risks.push("Год не подтвержден из открытых данных, попросите фото документов и отчет по VIN.");
+  }
+
+  if (item.mileage) {
+    if (item.mileage <= 70000) buySignals.push("Пробег умеренный, но его нужно подтвердить сервисной историей и отчетом.");
+    else if (item.mileage <= 150000) inspectionPlan.push("Пробег средний: особое внимание коробке, подвеске, рулевой, тормозам и утечкам.");
+    else {
+      risks.push("Пробег высокий, вероятность вложений в подвеску, двигатель, коробку и салон выше.");
+      likelyRepairs.unshift("Диагностика компрессии/эндоскопия двигателя и проверка коробки под нагрузкой.");
+    }
+  } else {
+    risks.push("Пробег не найден надежно, попросите фото одометра и отчет с историей пробега.");
+  }
+
+  if (item.photoAnalysis?.ok) {
+    const photoText = `Фото: ${item.photoAnalysis.label || "локальная оценка выполнена"}, балл ${item.photoAnalysis.score.toFixed(1)} из 10.`;
+    if (item.photoAnalysis.score >= 7.3) buySignals.push(photoText);
+    else {
+      risks.push(photoText);
+      inspectionPlan.push("Попросить дополнительные фото кузова при дневном свете, салона, подкапотного пространства, порогов и арок.");
+    }
+  } else if (item.image) {
+    risks.push("Фото есть, но локальный анализ не смог получить достаточно данных. Галерею лучше смотреть вручную.");
+  } else {
+    risks.push("Фото не извлечены из выдачи, без ручного просмотра объявление слабое для принятия решения.");
+  }
+
+  const flags = findDescriptionFlags(description);
+  risks.push(...flags.risks);
+  buySignals.push(...flags.good);
+  whatToAsk.push(...flags.questions);
+
+  const sellerSignals = getSellerSignals(description, item.source);
+  inspectionPlan.push(...sellerSignals.checks);
+  risks.push(...sellerSignals.risks);
+
+  const decision = score.total >= 8.1 && risks.length <= 4
+    ? "Сильный кандидат"
+    : score.total >= 7.1
+      ? "Можно рассматривать"
+      : "Только после проверок";
+
+  return {
+    decision,
+    verdict: `${item.title || "Автомобиль"}: ${score.total.toFixed(1)} из 10`,
+    summary: buildDeepSummary(item, score, profile, risks),
+    buySignals: buySignals.slice(0, 6),
+    risks: risks.slice(0, 8),
+    inspectionPlan: inspectionPlan.slice(0, 7),
+    whatToAsk: whatToAsk.slice(0, 7),
+    likelyRepairs: likelyRepairs.slice(0, 6),
+    maintenanceEstimate,
+    finalAdvice: getFinalAdvice(score.total, risks.length, profile),
+  };
+}
+
+function getMaintenanceProfile(item) {
+  const title = cleanText(item.title || "").toLowerCase();
+  const premium = /\b(bmw|mercedes|audi|lexus|volvo|infiniti|land rover|porsche)\b/i.test(title);
+  const crossover = /\b(rav4|cx-5|tiguan|tucson|sportage|santa fe|x-trail|qashqai|touareg|outlander|forester|cr-v|duster|kodiaq)\b/i.test(title);
+  const mass = /\b(rio|solaris|polo|rapid|octavia|elantra|cerato|corolla|camry|logan|granta|vesta|largus)\b/i.test(title);
+
+  if (premium) {
+    return {
+      annual: "180 000 - 400 000 ₽ в год",
+      basicService: "35 000 - 80 000 ₽",
+      reserve: "250 000 - 500 000 ₽",
+      repairs: [
+        "Проверка турбин, цепей/ремней ГРМ, течей масла и состояния охлаждения.",
+        "Диагностика АКПП/робота, пневмы или адаптивной подвески, если они есть.",
+        "Проверка оригинальности пробега через блоки и сервисную историю.",
+      ],
+    };
+  }
+
+  if (crossover) {
+    return {
+      annual: "90 000 - 220 000 ₽ в год",
+      basicService: "18 000 - 45 000 ₽",
+      reserve: "120 000 - 250 000 ₽",
+      repairs: [
+        "Проверка полного привода, муфты, раздатки и кардана, если привод 4WD.",
+        "Осмотр подвески, ступиц, тормозов и состояния шин.",
+        "Проверка вариатора/автомата и регулярности замены масла в трансмиссии.",
+      ],
+    };
+  }
+
+  if (mass) {
+    return {
+      annual: "45 000 - 120 000 ₽ в год",
+      basicService: "10 000 - 28 000 ₽",
+      reserve: "70 000 - 150 000 ₽",
+      repairs: [
+        "Проверка подвески, рулевой рейки, тормозов и состояния кузова снизу.",
+        "Проверка коробки передач, особенно если это робот, вариатор или старый автомат.",
+        "Сверка пробега с износом салона, руля, педалей и сервисной историей.",
+      ],
+    };
+  }
+
+  return {
+    annual: "70 000 - 180 000 ₽ в год",
+    basicService: "15 000 - 40 000 ₽",
+    reserve: "100 000 - 220 000 ₽",
+    repairs: [
+      "Проверка двигателя, коробки, подвески, тормозов и кузова перед задатком.",
+      "Сверка регламентных работ по возрасту и пробегу.",
+      "Проверка доступности запчастей и стоимости типовых работ по модели.",
+    ],
+  };
+}
+
+function findDescriptionFlags(description) {
+  const risks = [];
+  const good = [];
+  const questions = [];
+
+  if (/такси|каршеринг|аренд/.test(description)) risks.push("В описании есть признаки такси, аренды или коммерческой эксплуатации.");
+  if (/дтп|авари|бит|восстанов/.test(description)) risks.push("Есть упоминания ДТП или кузовного восстановления, нужен осмотр геометрии и отчет.");
+  if (/залог|огранич|арест|запрет/.test(description)) risks.push("Возможны юридические ограничения, проверка документов обязательна до задатка.");
+  if (/окрас|крашен|красил/.test(description)) questions.push("Какие элементы красились и есть ли фото до ремонта?");
+  if (/без вложений|обслужен|сервисн|заказ-наряд/.test(description)) good.push("Описание обещает обслуживание или отсутствие вложений, попросите подтверждающие заказ-наряды.");
+  if (/торг/.test(description)) good.push("Возможен торг, после диагностики можно аргументировать снижение цены.");
+  if (/срочно/.test(description)) risks.push("Срочная продажа требует аккуратной проверки причины и документов.");
+
+  return { risks, good, questions };
+}
+
+function getSellerSignals(description, source) {
+  const risks = [];
+  const checks = [];
+
+  if (/дилер|салон|официальн/.test(description)) {
+    checks.push("Если продавец салон, проверить комиссионный договор, собственника в ПТС и условия гарантии.");
+  } else if (/собственник|частник|один владелец/.test(description)) {
+    checks.push("Если продает собственник, сверить паспорт продавца с ПТС/СТС и договором.");
+  } else {
+    risks.push(`Тип продавца на ${source || "площадке"} не определен, уточните кто вписан в документы и кто принимает деньги.`);
+  }
+
+  return { risks, checks };
+}
+
+function buildDeepSummary(item, score, profile, risks) {
+  const parts = [`Итоговая оценка ${score.total.toFixed(1)} из 10.`];
+  if (item.year) parts.push(`Год: ${item.year}.`);
+  if (item.mileage) parts.push(`Пробег: ${new Intl.NumberFormat("ru-RU").format(item.mileage)} км.`);
+  parts.push(`Ориентир по содержанию: ${profile.annual}.`);
+  if (risks.length) parts.push(`Главные сомнения: ${risks.slice(0, 2).join(" ")}`);
+  return parts.join(" ");
+}
+
+function getFinalAdvice(total, riskCount, profile) {
+  if (total >= 8.1 && riskCount <= 4) {
+    return `Можно ехать на осмотр, но только с VIN-отчетом и диагностикой. Держите резерв на первые работы: ${profile.reserve}.`;
+  }
+  if (total >= 7.1) {
+    return `Объявление можно держать в списке, но решение принимать после отчета, торга и диагностики. Резерв на старт: ${profile.reserve}.`;
+  }
+  return `Покупать без глубокой проверки не стоит. Сначала документы, история, диагностика и понятный торг; резерв на риски: ${profile.reserve}.`;
+}
+
 function isRelevantToQuery(item, query) {
   const rawTerms = cleanText(query)
     .toLowerCase()
@@ -1073,6 +1341,13 @@ async function handleSearch(request, response) {
 
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
+
+  if (url.pathname === "/api/analyze") {
+    handleAnalyze(request, response).catch((error) => {
+      sendJson(response, 500, { error: error.message });
+    });
+    return;
+  }
 
   if (url.pathname === "/api/search") {
     handleSearch(request, response).catch((error) => {
