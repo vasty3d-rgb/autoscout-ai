@@ -278,8 +278,52 @@ h2 {
   grid-template-columns: 1fr 1fr 2fr;
 }
 
+.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .wide-field {
   grid-column: auto;
+}
+
+.filter-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.filter-section + .filter-section {
+  margin-top: 12px;
+}
+
+.filter-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.filter-section-title span {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.filter-section-title strong {
+  font-size: 15px;
 }
 
 .search-panel label {
@@ -398,6 +442,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  max-width: 460px;
 }
 
 .price-presets {
@@ -924,6 +969,8 @@ h2 {
 @media (max-width: 920px) {
   .filter-grid,
   .main-filters,
+  .two-columns,
+  .three-columns,
   .metrics,
   .cards,
   .insight-grid {
@@ -960,6 +1007,8 @@ h2 {
 
   .filter-grid,
   .main-filters,
+  .two-columns,
+  .three-columns,
   .metrics,
   .cards,
   .insight-grid {

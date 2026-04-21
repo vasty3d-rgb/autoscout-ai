@@ -69,24 +69,37 @@
           </div>
 
           <div class="filter-page is-active" data-page="basic">
-            <div class="filter-grid">
-              <label>
-                <span>Регион</span>
-                <select id="regionInput"></select>
-              </label>
-              <label>
-                <span>Радиус</span>
-                <select id="radiusInput">
-                  <option value="0">Только регион</option>
-                  <option value="50">+ 50 км</option>
-                  <option value="100" selected>+ 100 км</option>
-                  <option value="300">+ 300 км</option>
-                  <option value="all">Вся Россия</option>
-                </select>
-              </label>
-              <div class="price-filter wide-field">
+            <div class="filter-section">
+              <div class="filter-section-title">
+                <span>01</span>
+                <strong>Где искать</strong>
+              </div>
+              <div class="filter-grid two-columns">
+                <label>
+                  <span>Регион</span>
+                  <select id="regionInput"></select>
+                </label>
+                <label>
+                  <span>Радиус</span>
+                  <select id="radiusInput">
+                    <option value="0">Только регион</option>
+                    <option value="50">+ 50 км</option>
+                    <option value="100" selected>+ 100 км</option>
+                    <option value="300">+ 300 км</option>
+                    <option value="all">Вся Россия</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">
+                <span>02</span>
+                <strong>Цена</strong>
+              </div>
+              <div class="price-filter">
                 <div class="price-filter-head">
-                  <span>Цена</span>
+                  <span>Диапазон цены</span>
                   <strong id="priceRangeLabel">0 ₽ - 2 500 000 ₽</strong>
                 </div>
                 <div class="range-slider">
@@ -112,6 +125,14 @@
                   <button type="button" data-price-max="10000000">до 10 млн</button>
                 </div>
               </div>
+            </div>
+
+            <div class="filter-section">
+              <div class="filter-section-title">
+                <span>03</span>
+                <strong>Год и пробег</strong>
+              </div>
+              <div class="filter-grid three-columns">
               <label>
                 <span>Год от</span>
                 <select id="yearInput"></select>
@@ -140,6 +161,7 @@
                   <option value="fresh">Свежий год и малый пробег</option>
                 </select>
               </label>
+              </div>
             </div>
           </div>
 
